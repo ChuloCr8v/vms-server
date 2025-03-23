@@ -28,12 +28,31 @@ export class AuthController {
     return this.authService.forgotPassword(email);
   }
 
-  @Put('reset-password/:email/:token')
+  @Put('reset-password/:token/:email')
   resetPassword(
     @Param('email') email: string,
     @Param('token') token: string,
-    @Body() password: string,
+    @Body() data: { password: string },
   ) {
-    return this.authService.resetPassword(email, token, password);
+    return this.authService.resetPassword(email, token, data.password);
+  }
+
+  @Put('request-otp')
+  requestOTP(@Body() data: { email: string }) {
+    return this.authService.requestOTP(data.email);
+  }
+
+  @Put('verify-otp')
+  veritfyOTP(@Body() data: { email: string; otp: string }) {
+    const { email, otp } = data;
+    return this.authService.verifyOTP(email, otp);
+  }
+
+  @Post('/employee/:orgId')
+  createEmployee(
+    @Body() createEmployeeDTO: Prisma.EmployeeCreateInput,
+    @Param('orgId') orgId: string,
+  ) {
+    return this.authService.createEmployee(createEmployeeDTO, orgId);
   }
 }

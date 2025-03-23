@@ -21,6 +21,7 @@ export class TokenService {
   async generateVerificationToken() {
     const token = crypto.randomBytes(32).toString('hex');
     const hashedToken = await hashData.hashString(token);
+
     const verificationTokenExpiresAt = addMinutes(new Date(), 30);
 
     return { token, hashedToken, verificationTokenExpiresAt };

@@ -24,6 +24,8 @@ model Visitor {
   company        String
   organization   Organization? @relation(fields: [organizationId], references: [id])
   organizationId String?
+  employee       Employee?     @relation(fields: [employeeId], references: [id])
+  employeeId     String?
 }
 
 model Visit {
@@ -34,22 +36,38 @@ model Visit {
   host           String
   checkOut       DateTime?
   visitor        Visitor       @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  Organization   Organization? @relation(fields: [OrganizationId], references: [id])
-  OrganizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  employee       Employee?     @relation(fields: [employeeId], references: [id])
+  employeeId     String?
 }
 
 model Organization {
-  id                         String    @id @default(uuid())
-  email                      String    @unique
+  id                         String     @id @default(uuid())
+  email                      String     @unique
   password                   String
   organization               String
   verificationToken          String?
   verificationTokenExpiresAt DateTime?
   verificationOTPExpiresAt   String?
   verificationOTP            String?
-  isVerified                 Boolean   @default(false)
-  createdAt                  DateTime  @default(now())
+  isVerified                 Boolean    @default(false)
+  createdAt                  DateTime   @default(now())
   visitors                   Visitor[]
   visits                     Visit[]
   refreshToken               String?
+  employees                  Employee[]
+}
+
+model Employee {
+  id             String        @id @default(uuid())
+  name           String
+  email          String        @unique
+  password       String
+  role           String        @default("staff")
+  isAdmin        Boolean       @default(false)
+  Organization   Organization? @relation(fields: [OrganizationId], references: [id])
+  OrganizationId String?
+  visits         Visit[]
+  visitors       Visitor[]
 }

@@ -8,7 +8,9 @@ import { SendEmailDTo } from 'src/dto/sendEmailDTO';
 import { MailerService } from 'src/mailer/mailer.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { BcryptCompare } from 'src/utils/bcryptCompare';
+import { generatePassword } from 'src/utils/generatePassword';
 import { hashData } from 'src/utils/hash';
+import { OTPService } from 'src/utils/otp';
 import { TokenService } from 'src/utils/tokens';
 import { verificationLink } from 'src/utils/verificationLink';
 
@@ -186,7 +188,6 @@ export class AuthService {
   }
 
   // forgot password
-
   async forgotPassword(email: string) {
     try {
       const organization = await this.prisma.organization.findUnique({
@@ -196,7 +197,7 @@ export class AuthService {
 
       const { token, verificationTokenExpiresAt, hashedToken } =
         await this.tokenService.generateVerificationToken();
-      const link = verificationLink.link(token, email);
+      const link = `${process.env.BASE_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
       await this.prisma.organization.update({
         where: { id: organization.id },
@@ -224,36 +225,186 @@ export class AuthService {
     }
   }
 
-  async resetPassword(email: string, token: string, password: string) {
+  // reset password
+  async resetPassword(
+    email: string,
+    token: string,
+    password: string,
+    verificationType?: string,
+  ) {
+    if (!password) return Errors.PASSWORD_IS_REQUIRED;
+    const otpVerification = verificationType === 'otp';
+
     try {
       const organization = await this.prisma.organization.findUnique({
         where: { email },
       });
-
       if (!organization) return Errors.EMAIL_DOES_NOT_EXIST;
 
-      const verify = await BcryptCompare.compare(
-        organization.verificationToken,
-        token,
-      );
+      const currentToken = otpVerification
+        ? organization.verificationOTP
+        : organization.verificationToken;
+
+      if (!currentToken) return Errors.INVALID_TOKEN;
+
+      const isValid = await bcrypt.compare(token, currentToken);
+
+      if (!isValid) return Errors.INVALID_TOKEN;
 
       if (
-        this.tokenService.tokenExpired(organization.verificationTokenExpiresAt)
+        this.tokenService.tokenExpired(
+          otpVerification
+            ? new Date(organization.verificationOTPExpiresAt)
+            : new Date(organization.verificationTokenExpiresAt),
+        )
       )
         return Errors.TOKEN_EXPIRED;
-
-      if (!verify) return Errors.INVALID_TOKEN;
 
       await this.prisma.organization.update({
         where: { id: organization.id },
         data: {
           password: await hashData.hashString(password),
+          verificationOTP: null,
+          verificationOTPExpiresAt: null,
           verificationToken: null,
           verificationTokenExpiresAt: null,
         },
       });
 
+      const replacements = {
+        name: organization.organization,
+        companyName: organization.organization,
+        loginLink: 'www.vms.com',
+        year: new Date().getFullYear().toString(),
+      };
+
+      await this.emailService.sendTemplateMail(
+        email,
+        'Password Reset Successful',
+        'passwordResetSuccessful',
+        replacements,
+      );
+
       return 'Password reset successful';
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  // request OTP
+  async requestOTP(email: string) {
+    if (!email) return Errors.EMAIL_IS_REQUIRED;
+
+    try {
+      const user = await this.prisma.organization.findUnique({
+        where: { email },
+      });
+
+      if (!user) return Errors.EMAIL_DOES_NOT_EXIST;
+
+      const OTP = OTPService.generateOTP();
+      await this.prisma.organization.update({
+        where: { id: user.id },
+        data: {
+          verificationOTP: await OTP.hashedOTP,
+          verificationOTPExpiresAt: (
+            await this.tokenService.generateVerificationToken()
+          ).verificationTokenExpiresAt.toString(),
+        },
+      });
+
+      const replacements = {
+        otp: OTP.otp,
+        year: new Date().getFullYear().toString(),
+        name: user.organization,
+        companyName: 'VMS',
+      };
+
+      await this.emailService.sendTemplateMail(
+        email,
+        'Reset Password OTP',
+        'otp',
+        replacements,
+      );
+
+      return { message: 'OTP Sent successfully', user };
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  // Verify OTP
+  async verifyOTP(email: string, otp: string) {
+    if (!email) return Errors.EMAIL_IS_REQUIRED;
+    if (!otp) return Errors.TOKEN_IS_REQUIRED;
+
+    try {
+      const user = await this.prisma.organization.findUnique({
+        where: { email },
+      });
+
+      if (!user) return Errors.EMAIL_DOES_NOT_EXIST;
+
+      if (new Date(user.verificationOTPExpiresAt) < new Date())
+        return Errors.TOKEN_EXPIRED;
+
+      const verify = await bcrypt.compare(otp, user.verificationOTP);
+
+      if (!verify) return Errors.INVALID_TOKEN;
+
+      await this.prisma.organization.update({
+        where: { id: user.id },
+        data: {
+          verificationOTP: null,
+          verificationOTPExpiresAt: null,
+        },
+      });
+
+      return 'OTP verification successful';
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  async createEmployee(data: Prisma.EmployeeCreateInput, orgId: string) {
+    try {
+      const findEmployee = this.prisma.employee.findUnique({
+        where: { email: data.email },
+      });
+
+      if (findEmployee) Errors.EMAIL_ALREADY_EXISTS;
+
+      const organization = await this.prisma.organization.findUnique({
+        where: { id: orgId },
+      });
+
+      if (!organization) throw Errors.EMAIL_DOES_NOT_EXIST;
+
+      const password = generatePassword.password();
+      const hashedPassword = await hashData.hashString(password);
+
+      const employeeData = { ...data, password: hashedPassword };
+
+      const res = await this.prisma.employee.create({
+        data: employeeData,
+      });
+
+      const replacements = {
+        name: data.name,
+        organization: organization.organization,
+        loginUrl: process.env.BASE_URL,
+        year: new Date().getFullYear().toString(),
+        companyName: 'DMS',
+      };
+
+      await this.emailService.sendTemplateMail(
+        data.email,
+        'Welcome to VMS',
+        'employeeDetails',
+        replacements,
+      );
+
+      return res;
     } catch (error) {
       throw new Error(error);
     }
