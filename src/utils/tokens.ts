@@ -12,7 +12,7 @@ export class TokenService {
   generateToken(userId: string, email: string) {
     const token = this.jwtService.sign(
       { userId, email },
-      { secret: process.env.JWT_SECRET_KEY, expiresIn: '7h' },
+      { secret: process.env.JWT_SECRET_KEY, expiresIn: '3d' },
     );
     return token;
   }

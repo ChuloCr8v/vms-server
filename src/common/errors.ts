@@ -16,11 +16,19 @@ export const Errors = {
     'Email already exists',
     HttpStatus.CONFLICT,
   ),
+  ACCOUNT_DOES_NOT_EXIST: new CustomError(
+    'Account does not exist',
+    HttpStatus.NOT_FOUND,
+  ), // Changed from UNAUTHORIZED to NOT_FOUND
   EMAIL_DOES_NOT_EXIST: new CustomError(
     'Account does not exist',
     HttpStatus.NOT_FOUND,
   ), // Changed from UNAUTHORIZED to NOT_FOUND
   EMAIL_IS_REQUIRED: new CustomError(
+    'Organization email is required',
+    HttpStatus.BAD_REQUEST,
+  ), // Changed from NO_CONTENT to BAD_REQUEST
+  ID_IS_REQUIRED: new CustomError(
     'Organization email is required',
     HttpStatus.BAD_REQUEST,
   ), // Changed from NO_CONTENT to BAD_REQUEST

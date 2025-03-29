@@ -1,8 +1,10 @@
-import { Body, Controller, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Prisma } from '@prisma/client';
 import { AccountVerificationDTO } from 'src/dto/accountVerificationDTO';
 import { OrganizationLoginDTO } from 'src/dto/loginDTO';
+import { Errors } from 'src/common/errors';
+import { RolesGuard } from 'src/guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -54,5 +56,20 @@ export class AuthController {
     @Param('orgId') orgId: string,
   ) {
     return this.authService.createEmployee(createEmployeeDTO, orgId);
+  }
+
+  @Put('/employee/admin-role/:id')
+  updateAdminRole(@Param('id') id: string) {
+    // console.log(id);
+    return this.authService.updateAdminRole(id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Put('/update-status/:id')
+  updateUserStatus(@Param('id') id: string) {
+    // console.log(id);
+
+    if (!id) return Errors.ID_IS_REQUIRED;
+    return this.authService.updateUserStatus(id);
   }
 }

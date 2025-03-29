@@ -366,27 +366,36 @@ export class AuthService {
     }
   }
 
+  // create employee
+
   async createEmployee(data: Prisma.EmployeeCreateInput, orgId: string) {
     try {
-      const findEmployee = this.prisma.employee.findUnique({
+      const findEmployee = await this.prisma.employee.findUnique({
         where: { email: data.email },
       });
 
-      if (findEmployee) Errors.EMAIL_ALREADY_EXISTS;
+      if (findEmployee) return Errors.EMAIL_ALREADY_EXISTS;
 
       const organization = await this.prisma.organization.findUnique({
         where: { id: orgId },
       });
 
-      if (!organization) throw Errors.EMAIL_DOES_NOT_EXIST;
+      if (!organization) return Errors.EMAIL_DOES_NOT_EXIST;
 
       const password = generatePassword.password();
       const hashedPassword = await hashData.hashString(password);
 
-      const employeeData = { ...data, password: hashedPassword };
+      const employeeData = {
+        ...data,
+        password: hashedPassword,
+        Organization: {
+          connect: { id: orgId },
+        },
+      };
 
       const res = await this.prisma.employee.create({
         data: employeeData,
+        // include: { Organization: true },
       });
 
       const replacements = {
@@ -405,6 +414,66 @@ export class AuthService {
       );
 
       return res;
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  // update admin role
+
+  async updateAdminRole(id: string) {
+    if (!id) return new Error('Employee Id is required');
+
+    try {
+      const employee = await this.prisma.employee.findUnique({ where: { id } });
+      if (!employee) return Errors.ACCOUNT_DOES_NOT_EXIST;
+
+      const organization = await this.prisma.organization.findUnique({
+        where: { id: employee.OrganizationId },
+      });
+
+      const update = await this.prisma.employee.update({
+        where: { id },
+        data: { isAdmin: !employee.isAdmin },
+      });
+
+      const replacements = {
+        name: employee.name,
+        organization: organization.organization,
+        url: process.env.FRONTEND_URL,
+        year: new Date().getFullYear().toString(),
+      };
+
+      !employee.isAdmin &&
+        (await this.emailService.sendTemplateMail(
+          employee.email,
+          'Admin Role Updated',
+          'adminRole',
+          replacements,
+        ));
+
+      return update;
+    } catch (error) {
+      throw new Error(error);
+    }
+  }
+
+  async updateUserStatus(id: string) {
+    try {
+      const employee = await this.prisma.employee.findUnique({
+        where: { id },
+      });
+
+      if (!employee) return Errors.ACCOUNT_DOES_NOT_EXIST;
+
+      const updateEmployeeStatus = await this.prisma.employee.update({
+        where: { id },
+        data: {
+          isActive: !employee.isActive,
+        },
+      });
+
+      return updateEmployeeStatus;
     } catch (error) {
       throw new Error(error);
     }

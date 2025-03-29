@@ -57,6 +57,7 @@ model Organization {
   visits                     Visit[]
   refreshToken               String?
   employees                  Employee[]
+  isActive                   Boolean    @default(true)
 }
 
 model Employee {
@@ -70,4 +71,5 @@ model Employee {
   OrganizationId String?
   visits         Visit[]
   visitors       Visitor[]
+  isActive       Boolean       @default(true)
 }

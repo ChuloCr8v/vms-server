@@ -1,7 +1,7 @@
 <html>
 
   <head>
-    <title>Welcome To VMS</title>
+    <title>Verify Your Account</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -27,10 +27,6 @@
         color: #555;
       }
 
-      .org {
-        font-weight: bold;
-      }
-
       .button {
         display: inline-block;
         padding: 10px 20px;
@@ -52,15 +48,16 @@
 
   <body>
     <div class='container'>
-      <h1>Welcome to Visitor Management System</h1>
+      <h1>You are now an admin</h1>
       <p>Hello {{name}},</p>
       <p>Your organization,
-        <span class='org'>{{organization}}</span>
-        just onboarded you. Login to use your account</p>
+        {{organization}}
+        has added admin priviledges to your account.</p>
+      <p>Login to know the things that you can do.</p>
 
-      <a class='button' href={{loginUrl}}>Login</a>
+      <a href={{url}} class='button'>Login</a>
       <div class='footer'>
-        <p>&copy; {{year}} {{companyName}}. All rights reserved.</p>
+        <p>&copy; {{year}} EMS. All rights reserved.</p>
       </div>
     </div>
   </body>
